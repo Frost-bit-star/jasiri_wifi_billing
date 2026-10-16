@@ -68,18 +68,15 @@ function getServerPublicKey() {
 }
 
 function assignWireGuardIP($db) {
-    // IPs already recorded locally.
-    $stmt = $db->query("SELECT wireguard_ip FROM routers WHERE wireguard_ip IS NOT NULL AND type='mikrotik'");
-    $used = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    // Also avoid anything TunGuard has already allocated, even if it is not
-    // in our own DB (e.g. peers added via the TunGuard dashboard).
+    // TunGuard is the source of truth for allocated IPs. Ask it for its live
+    // peer list first — this is what actually occupies the subnet.
+    $used = [];
     foreach (tunGuard()->getPeers() as $peer) {
         $allowed = $peer['allowed_ip'] ?? '';
         if ($allowed === '') {
             continue;
         }
-        // allowed_ip may be "10.100.0.5/32" or a list; take the first address.
+        // allowed_ip may be "10.100.0.5/32" or a comma list; take first address.
         $addr = trim(explode(',', $allowed)[0]);
         $addr = trim(explode('/', $addr)[0]);
         if (filter_var($addr, FILTER_VALIDATE_IP)) {
@@ -87,6 +84,18 @@ function assignWireGuardIP($db) {
         }
     }
 
+    // Also treat IPs held by routers that actually completed registration as
+    // used, even if TunGuard's peer list is momentarily unavailable.
+    $stmt = $db->query("SELECT wireguard_ip FROM routers WHERE wireguard_ip IS NOT NULL AND wireguard_ip != '0.0.0.0' AND type='mikrotik' AND provisioning_status = 'registered'");
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $ip) {
+        $used[] = $ip;
+    }
+
+    // NOTE: routers left in 'pending'/'registered' with an IP that TunGuard does
+    // not know about are ghost reservations. They do NOT block allocation here,
+    // so a failed registration can never permanently leak an IP.
+
+    $used = array_unique($used);
     for ($i = 2; $i < 254; $i++) {
         $ip = "10.100.0.$i";
         if (!in_array($ip, $used)) return $ip;
