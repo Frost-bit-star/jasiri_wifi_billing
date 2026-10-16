@@ -68,7 +68,7 @@ $deviceId = $_GET['id'] ?? null;
                 <input type="hidden" id="routerId" value="<?= htmlspecialchars($deviceId) ?>">
                 <div class="form-group">
                     <label class="form-label" for="ssid">Network Name (SSID)</label>
-                    <input type="text" class="form-control" id="ssid" placeholder="e.g. JasiriWiFi" maxlength="32" required>
+                    <input type="text" class="form-control" id="ssid" placeholder="e.g. OneLink" maxlength="32" required>
                 </div>
                 <div id="wirelessMsg"></div>
                 <button type="submit" class="btn btn-primary" id="applyWirelessBtn">
@@ -138,12 +138,12 @@ async function loadWirelessSsid() {
     try {
         const res = await fetch(`/api/wireless.php?action=get&router_id=${deviceData.id}`);
         const data = await res.json();
-        document.getElementById('ssid').value = data.ssid || deviceData.ssid || 'JasiriWiFi';
+        document.getElementById('ssid').value = data.ssid || deviceData.ssid || 'OneLink';
         if (data.reachable === false) {
             document.getElementById('wirelessMsg').innerHTML = '<div class="alert alert-warning py-2"><i class="fas fa-exclamation-triangle"></i> Router offline — showing saved config.</div>';
         }
     } catch (e) {
-        document.getElementById('ssid').value = deviceData.ssid || 'JasiriWiFi';
+        document.getElementById('ssid').value = deviceData.ssid || 'OneLink';
     }
 }
 
@@ -159,7 +159,7 @@ async function loadDevice() {
 
         document.getElementById('deviceName').textContent = deviceData.name;
         document.getElementById('routerId').value = deviceData.id;
-        document.getElementById('ssid').value = deviceData.ssid || 'JasiriWiFi';
+        document.getElementById('ssid').value = deviceData.ssid || 'OneLink';
         loadWirelessSsid();
 
         const status = deviceData.provisioning_status || 'offline';

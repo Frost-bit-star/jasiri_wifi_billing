@@ -1,7 +1,9 @@
 <?php
 
-define('SMS_API_KEY', 'sv_live_ba4352a71620f7d426da24beb7b0e6466bdeeae5f616999b');
-define('SMS_API_URL', 'https://gateway.stackverify.site/api/sms/send');
+require_once __DIR__ . '/../config.php';
+
+define('SMS_API_KEY', (string) env('SMS_API_KEY', 'sv_live_ba4352a71620f7d426da24beb7b0e6466bdeeae5f616999b'));
+define('SMS_API_URL', (string) env('SMS_API_URL', 'https://gateway.stackverify.site/api/sms/send'));
 
 function sendSms($number, $message) {
     $number = preg_replace('/[^0-9]/', '', $number);

@@ -30,11 +30,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $name     = trim($_POST['name'] ?? '');
     $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
 
-    if (!$name || !$email || !$password) {
+    if (!$name || !$email || !$password || !$confirmPassword) {
         $regMessage = 'All fields are required.';
-    } elseif (strlen($password) < 4) {
-        $regMessage = 'Password must be at least 4 characters.';
+    } elseif ($password !== $confirmPassword) {
+        $regMessage = 'Passwords do not match.';
+    } elseif (strlen($password) < 8) {
+        $regMessage = 'Password must be at least 8 characters.';
     } else {
         $check = $db->prepare("SELECT id FROM accounts WHERE email = ?");
         $check->execute([$email]);
@@ -44,7 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $db->prepare("INSERT INTO accounts (name, email, password) VALUES (?, ?, ?)");
             $stmt->execute([$name, $email, $hashed]);
-            $regMessage = 'Account created! You can now login.';
+            $newId = $db->lastInsertId();
+            $_SESSION['just_registered'] = true;
+            $_SESSION['account_id'] = $newId;
+            $_SESSION['username'] = $name;
+            $_SESSION['account_email'] = $email;
+            authLoginUser(['id' => $newId, 'name' => $name, 'email' => $email, 'role' => 'user', 'status' => 1]);
+            header('Location: /dashboard');
+            exit;
         }
     }
 }
@@ -182,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login · Jasiri WiFi</title>
+<title>Login · <?= htmlspecialchars(appName()) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Display:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -215,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <div class="login-logo-icon">
             <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
         </div>
-        <div class="login-logo-text">Jasiri WiFi</div>
+        <div class="login-logo-text"><?= htmlspecialchars(appName()) ?></div>
     </div>
 
     <?php if(isset($errorMessage)): ?><div class="alert alert-danger"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg><span><?= htmlspecialchars($errorMessage) ?></span></div><?php endif; ?>
@@ -224,9 +234,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     <!-- Tabs -->
     <div class="tabs" style="justify-content:center;gap:4px">
-        <button class="tab-btn active" onclick="showTab('account')">Account Login</button>
-        <button class="tab-btn" onclick="showTab('register')">Register</button>
-        <button class="tab-btn" onclick="showTab('admin')">Admin</button>
+        <button class="tab-btn active" data-tab="account" onclick="showTab('account')">Account Login</button>
+        <button class="tab-btn" data-tab="register" onclick="showTab('register')">Register</button>
+        <button class="tab-btn" data-tab="admin" onclick="showTab('admin')">Admin</button>
     </div>
 
     <!-- Account Login -->
@@ -259,7 +269,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             </div>
             <div class="form-group">
                 <label class="form-label">Password</label>
-                <input class="form-control" type="password" name="password" placeholder="Create password" required>
+                <input class="form-control" type="password" name="password" placeholder="Create password (min 8 chars)" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <input class="form-control" type="password" name="confirm_password" placeholder="Confirm password" required>
             </div>
             <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Create Account</button>
         </form>

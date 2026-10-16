@@ -92,8 +92,8 @@ include __DIR__ . '/../components/header.php';
             </div>
 
             <div class="mb-4">
-                <h6><span class="chip info">2</span> Download and import Jasiri script</h6>
-                <p class="card-subtitle">Fetches the provisioning script from Jasiri and imports it. Wait 1–2 minutes for completion.</p>
+                <h6><span class="chip info">2</span> Download and import OneLink script</h6>
+                <p class="card-subtitle">Fetches the provisioning script from OneLink and imports it. Wait 1–2 minutes for completion.</p>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode('cmd2')"><i class="fas fa-copy"></i> Copy</button>
                     <code id="cmd2"></code>
@@ -153,7 +153,7 @@ include __DIR__ . '/../components/header.php';
                 <div class="form-row">
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label">Bridge Interface</label>
-                        <input type="text" class="form-control" value="jasiri-bridge" readonly>
+                        <input type="text" class="form-control" value="onelink-bridge" readonly>
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label">IP Pool</label>
@@ -276,10 +276,10 @@ document.getElementById('deviceForm').addEventListener('submit', async function(
 
         registeredRouter = data;
 
-        const serverHost = window.location.host || 'jasiri.stackverify.site';
+        const serverHost = window.location.host || '<?= htmlspecialchars(appHost(), ENT_QUOTES) ?>';
         const scheme = window.location.protocol === 'https:' ? 'https' : 'http';
         const fetchMode = scheme === 'https' ? 'https' : 'http';
-        const fetchCmd = `/tool fetch mode=${fetchMode} url="${scheme}://${serverHost}/provision/${data.provision_token}" dst-path=jasiri_${data.timestamp}.rsc; :delay 2s; /import jasiri_${data.timestamp}.rsc;`;
+        const fetchCmd = `/tool fetch mode=${fetchMode} url="${scheme}://${serverHost}/provision/${data.provision_token}" dst-path=onelink_${data.timestamp}.rsc; :delay 2s; /import onelink_${data.timestamp}.rsc;`;
         document.getElementById('cmd2').textContent = fetchCmd;
 
         if (scheme === 'http' && window.location.hostname !== 'localhost') {
@@ -374,7 +374,7 @@ async function finishSetup() {
         const data = await res.json();
 
         if (data.success) {
-            alert('Setup complete! Your MikroTik device is now connected to Jasiri WiFi.');
+            alert('Setup complete! Your MikroTik device is now connected to OneLink.');
             window.location.href = '/mikrotik_devices';
         }
     } catch (err) {

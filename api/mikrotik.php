@@ -15,6 +15,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../db/schema.php';
 require_once __DIR__ . '/mikrotik_api.php';
+require_once __DIR__ . '/../services/tanguard.php';
 
 function jsonResponse($data, $code = 200) {
     http_response_code($code);
@@ -38,54 +39,32 @@ function generateProvisionToken() {
 }
 
 function getServerHost() {
-    $host = $_SERVER['HTTP_HOST'] ?? '';
-    if (empty($host) || str_starts_with($host, '127.') || str_starts_with($host, 'localhost')) {
-        return 'jasiri.stackverify.site';
-    }
-    return $host;
+    return appHost();
 }
 
 function getServerScheme() {
-    $host = $_SERVER['HTTP_HOST'] ?? '';
-    if (empty($host) || str_starts_with($host, '127.') || str_starts_with($host, 'localhost') || preg_match('/^192\.168\./', $host) || preg_match('/^10\./', $host)) {
-        return 'http';
-    }
-    return 'https';
+    return appScheme();
 }
 
 function getServerWgPort() {
-    $output = [];
-    exec("wg show wg0 listen-port 2>/dev/null", $output, $returnCode);
-    if ($returnCode === 0 && !empty($output[0])) {
-        return intval(trim($output[0]));
-    }
-    $confFile = '/etc/wireguard/wg0.conf';
-    if (file_exists($confFile)) {
-        $conf = file_get_contents($confFile);
-        if (preg_match('/ListenPort\s*=\s*(\d+)/', $conf, $m)) {
-            return intval($m[1]);
-        }
+    $port = tunGuard()->getServerListenPort();
+    if (!empty($port)) {
+        return intval($port);
     }
     return 13231;
 }
 
 function getWireGuardEndpoint() {
-    return '156.232.88.212';
+    $endpoint = trim((string) env('WG_ENDPOINT', ''));
+    if ($endpoint !== '') {
+        return $endpoint;
+    }
+    return appHost();
 }
 
 function getServerPublicKey() {
-    $keyFile = __DIR__ . '/../db/server_wg_pubkey.txt';
-    $actual = trim(shell_exec('wg show wg0 public-key 2>/dev/null') ?: '');
-    if (!empty($actual)) {
-        if (!file_exists($keyFile) || trim(file_get_contents($keyFile)) !== $actual) {
-            file_put_contents($keyFile, $actual);
-        }
-        return $actual;
-    }
-    if (file_exists($keyFile)) {
-        return trim(file_get_contents($keyFile));
-    }
-    return null;
+    $key = trim((string) tunGuard()->getServerPublicKey());
+    return $key !== '' ? $key : null;
 }
 
 function assignWireGuardIP($db) {
@@ -99,20 +78,11 @@ function assignWireGuardIP($db) {
 }
 
 function addWireGuardPeer($peerPubKey, $allowedIP) {
-    exec("wg show wg0 2>/dev/null", $wgOutput, $wgCheck);
-    if ($wgCheck !== 0) {
-        return false;
-    }
-    $escaped = escapeshellarg($peerPubKey);
-    $ipEsc = escapeshellarg("$allowedIP/32");
-    exec("echo 'jackal' | sudo -S wg set wg0 peer $escaped allowed-ips $ipEsc 2>&1", $output, $returnCode);
-    return $returnCode === 0;
+    return tunGuard()->addPeer($peerPubKey, "$allowedIP/32");
 }
 
 function removeWireGuardPeer($peerPubKey) {
-    $escaped = escapeshellarg($peerPubKey);
-    exec("echo 'jackal' | sudo -S wg set wg0 peer $escaped remove 2>&1", $output, $returnCode);
-    return $returnCode === 0;
+    return tunGuard()->removePeer($peerPubKey);
 }
 
 function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId, $mode = 'hotspot') {
@@ -125,7 +95,7 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
     $wgEndpoint = getWireGuardEndpoint();
     $hasWG = !empty($serverPubKey) && !empty($wireguardIP) && $wireguardIP !== '0.0.0.0';
 
-    $script = "# Jasiri WiFi Auto-Provisioning Script\n";
+    $script = "# OneLink Auto-Provisioning Script\n";
     $script .= "# Device: $name - $deviceId\n";
     $script .= "# Generated: " . date('Y-m-d H:i:s') . " UTC\n";
     $script .= "# Service Mode: $mode\n";
@@ -133,21 +103,21 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
 
     $script .= "/system identity set name=\"$name\"\n\n";
 
-    $script .= ":do { /interface bridge remove [find name=jasiri-bridge] } on-error={}\n";
-    $script .= "/interface bridge add comment=\"Jasiri WiFi Bridge\" name=jasiri-bridge\n";
+    $script .= ":do { /interface bridge remove [find name=onelink-bridge] } on-error={}\n";
+    $script .= "/interface bridge add comment=\"OneLink Bridge\" name=onelink-bridge\n";
     $script .= "# --- Wireless Configuration ---\n";
     $script .= "/interface wireless security-profiles set [find default=yes] mode=none\n";
-    $script .= "/interface wireless set [find default-name=wlan1] disabled=no mode=ap-bridge ssid=\"Jasiri WiFi\" security-profile=default\n";
+    $script .= "/interface wireless set [find default-name=wlan1] disabled=no mode=ap-bridge ssid=\"OneLink\" security-profile=default\n";
     $script .= ":do { /interface bridge port remove [find interface=wlan1] } on-error={}\n";
-    $script .= "/interface bridge port add bridge=jasiri-bridge interface=wlan1\n\n";
+    $script .= "/interface bridge port add bridge=onelink-bridge interface=wlan1\n\n";
 
-    $script .= ":do { /ip address remove [find interface=jasiri-bridge] } on-error={}\n";
-    $script .= "/ip address add address=10.10.0.1/24 comment=\"Added by Jasiri\" interface=jasiri-bridge\n";
-    $script .= ":do { /ip pool remove [find name=jasiri-pool] } on-error={}\n";
-    $script .= "/ip pool add name=jasiri-pool ranges=10.10.0.2-10.10.0.254\n";
+    $script .= ":do { /ip address remove [find interface=onelink-bridge] } on-error={}\n";
+    $script .= "/ip address add address=10.10.0.1/24 comment=\"Added by OneLink\" interface=onelink-bridge\n";
+    $script .= ":do { /ip pool remove [find name=onelink-pool] } on-error={}\n";
+    $script .= "/ip pool add name=onelink-pool ranges=10.10.0.2-10.10.0.254\n";
     if ($mode !== 'pppoe') {
-        $script .= ":do { /ip dhcp-server remove [find name=jasiri-dhcp] } on-error={}\n";
-        $script .= "/ip dhcp-server add address-pool=jasiri-pool disabled=no interface=jasiri-bridge name=jasiri-dhcp\n";
+        $script .= ":do { /ip dhcp-server remove [find name=onelink-dhcp] } on-error={}\n";
+        $script .= "/ip dhcp-server add address-pool=onelink-pool disabled=no interface=onelink-bridge name=onelink-dhcp\n";
         $script .= ":do { /ip dhcp-server network remove [find address~\"10.10.0.0\"] } on-error={}\n";
         $script .= "/ip dhcp-server network add address=10.10.0.0/24 dns-server=10.10.0.1,8.8.8.8,8.8.4.4 gateway=10.10.0.1\n";
     }
@@ -155,21 +125,21 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
 
     $script .= ":do { /radius remove [find service=hotspot] } on-error={}\n";
     $script .= ":do { /radius remove [find service=ppp] } on-error={}\n";
-    $script .= "/radius add address=10.100.0.1 secret=\"jasiri123\" service=hotspot authentication-port=1812 accounting-port=1813 timeout=3s realm=\"$deviceId\" comment=\"Jasiri RADIUS\"\n";
-    $script .= "/radius add address=10.100.0.1 secret=\"jasiri123\" service=ppp authentication-port=1812 accounting-port=1813 timeout=3s realm=\"$deviceId\" comment=\"Jasiri RADIUS PPP\"\n";
+    $script .= "/radius add address=10.100.0.1 secret=\"onelink123\" service=hotspot authentication-port=1812 accounting-port=1813 timeout=3s realm=\"$deviceId\" comment=\"OneLink RADIUS\"\n";
+    $script .= "/radius add address=10.100.0.1 secret=\"onelink123\" service=ppp authentication-port=1812 accounting-port=1813 timeout=3s realm=\"$deviceId\" comment=\"OneLink RADIUS PPP\"\n";
     $script .= "/radius incoming set accept=yes port=3799\n\n";
 
     if ($hasWG) {
-        $script .= ":do { /interface wireguard remove [find name=jasiri-wg] } on-error={}\n";
-        $script .= "/interface wireguard add mtu=1420 name=jasiri-wg listen-port=13241\n\n";
+        $script .= ":do { /interface wireguard remove [find name=onelink-wg] } on-error={}\n";
+        $script .= "/interface wireguard add mtu=1420 name=onelink-wg listen-port=13241\n\n";
 
-        $script .= ":do { /ip address remove [find interface=jasiri-wg] } on-error={}\n";
-        $script .= "/ip address add address=$wireguardIP/24 interface=jasiri-wg\n\n";
+        $script .= ":do { /ip address remove [find interface=onelink-wg] } on-error={}\n";
+        $script .= "/ip address add address=$wireguardIP/24 interface=onelink-wg\n\n";
 
-        $script .= ":do { /interface wireguard peers remove [find interface=jasiri-wg] } on-error={}\n";
-        $script .= "/interface wireguard peers add interface=jasiri-wg public-key=\"$serverPubKey\" endpoint-address=$wgEndpoint endpoint-port=$listenPort allowed-address=10.100.0.0/24 persistent-keepalive=25s\n\n";
+        $script .= ":do { /interface wireguard peers remove [find interface=onelink-wg] } on-error={}\n";
+        $script .= "/interface wireguard peers add interface=onelink-wg public-key=\"$serverPubKey\" endpoint-address=$wgEndpoint endpoint-port=$listenPort allowed-address=10.100.0.0/24 persistent-keepalive=25s\n\n";
 
-        $script .= ":local wgPub [/interface wireguard get [find name=jasiri-wg] public-key]\n";
+        $script .= ":local wgPub [/interface wireguard get [find name=onelink-wg] public-key]\n";
         $script .= ":local url \"{$serverScheme}://{$serverHost}/api/wireguard_register.php\"\n";
         $script .= ":local postData (\"device={$deviceId}&pubkey=\" . \$wgPub)\n";
         $script .= ":local r [/tool fetch mode=https url=\$url http-method=post http-data=\$postData http-header-field=\"Content-Type: application/x-www-form-urlencoded\" keep-result=no as-value]\n";
@@ -179,8 +149,8 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
     }
 
     $serverSubnet = '192.168.0.0/16';
-    $serverHost = $_SERVER['HTTP_HOST'] ?? '';
-    $serverIP = preg_replace('/:\d+$/', '', $serverHost);
+    $requestHost = $_SERVER['HTTP_HOST'] ?? '';
+    $serverIP = preg_replace('/:\d+$/', '', $requestHost);
     if (preg_match('/^(\d+\.\d+\.\d+)\.\d+$/', $serverIP, $m)) {
         $serverSubnet = $m[1] . '.0/24';
     }
@@ -195,7 +165,7 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
         $script .= "/ip service set www address=0.0.0.0/0 disabled=no port=8080\n\n";
     }
 
-    $apiUser = 'jasiri-api';
+    $apiUser = 'onelink-api';
 
     // Reuse the existing password if the router already exists
     $stmt = $db->prepare("SELECT password FROM routers WHERE id = ?");
@@ -210,7 +180,7 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
     }
 
     $script .= ":do { /user remove [find name=$apiUser] } on-error={}\n";
-    $script .= "/user add name=$apiUser password=\"$apiPass\" group=full comment=\"Jasiri Management API\"\n\n";
+    $script .= "/user add name=$apiUser password=\"$apiPass\" group=full comment=\"OneLink Management API\"\n\n";
 
     $fwSrc = $hasWG ? "src-address=10.100.0.0/24" : "src-address=0.0.0.0/0";
     $fwSrcExtra = $hasWG ? "src-address=$serverSubnet" : "";
@@ -240,35 +210,35 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
     $script .= "\n";
 
     $script .= "/snmp set enabled=yes\n";
-    $script .= ":do { /snmp community remove [find name=jasiri] } on-error={}\n";
-    $script .= "/snmp community add name=jasiri addresses=10.100.0.0/24\n\n";
+    $script .= ":do { /snmp community remove [find name=onelink] } on-error={}\n";
+    $script .= "/snmp community add name=onelink addresses=10.100.0.0/24\n\n";
 
-    $script .= ":do { /ip firewall nat remove [find comment=\"Jasiri Internet Access\"] } on-error={}\n";
-    $script .= "/ip firewall nat add action=masquerade chain=srcnat comment=\"Jasiri Internet Access\"\n\n";
+    $script .= ":do { /ip firewall nat remove [find comment=\"OneLink Internet Access\"] } on-error={}\n";
+    $script .= "/ip firewall nat add action=masquerade chain=srcnat comment=\"OneLink Internet Access\"\n\n";
 
     if ($mode === 'pppoe') {
         $script .= "# --- PPPoE Server (WISP) ---\n";
-        $script .= ":do { /ppp profile remove [find name=jasiri-pppoe] } on-error={}\n";
-        $script .= "/ppp profile add name=jasiri-pppoe local-address=10.10.0.1 remote-address=jasiri-pool dns-server=10.10.0.1,8.8.8.8,8.8.4.4 comment=\"Jasiri PPPoE Profile\"\n";
-        $script .= ":do { /interface pppoe-server server remove [find name=jasiri-pppoe] } on-error={}\n";
-        $script .= "/interface pppoe-server server add name=jasiri-pppoe interface=jasiri-bridge service-name=jasiri default-profile=jasiri-pppoe authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes max-mtu=1480 max-mru=1480 keepalive-timeout=60\n";
-        $script .= "/interface pppoe-server server enable [find name=\"jasiri-pppoe\"]\n\n";
-        $script .= "# PPPoE user accounts are managed via RADIUS (service=ppp) by the Jasiri server\n\n";
+        $script .= ":do { /ppp profile remove [find name=onelink-pppoe] } on-error={}\n";
+        $script .= "/ppp profile add name=onelink-pppoe local-address=10.10.0.1 remote-address=onelink-pool dns-server=10.10.0.1,8.8.8.8,8.8.4.4 comment=\"OneLink PPPoE Profile\"\n";
+        $script .= ":do { /interface pppoe-server server remove [find name=onelink-pppoe] } on-error={}\n";
+        $script .= "/interface pppoe-server server add name=onelink-pppoe interface=onelink-bridge service-name=onelink default-profile=onelink-pppoe authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes max-mtu=1480 max-mru=1480 keepalive-timeout=60\n";
+        $script .= "/interface pppoe-server server enable [find name=\"onelink-pppoe\"]\n\n";
+        $script .= "# PPPoE user accounts are managed via RADIUS (service=ppp) by the OneLink server\n\n";
     } else {
         $script .= "# --- Hotspot / Captive Portal ---\n";
         $script .= ":do { /ip hotspot profile remove [find name=hs-prof1] } on-error={}\n";
-        $script .= "/ip hotspot profile add name=hs-prof1 hotspot-address=10.10.0.1 dns-name=jasiri.local login=http-pap\n\n";
+        $script .= "/ip hotspot profile add name=hs-prof1 hotspot-address=10.10.0.1 dns-name=onelink.local login=http-pap\n\n";
 
         $script .= ":do { /ip hotspot remove [find name=hotspot1] } on-error={}\n";
-        $script .= "/ip hotspot add name=hotspot1 interface=jasiri-bridge address-pool=jasiri-pool profile=hs-prof1\n";
+        $script .= "/ip hotspot add name=hotspot1 interface=onelink-bridge address-pool=onelink-pool profile=hs-prof1\n";
         $script .= "/ip hotspot enable [find name=\"hotspot1\"]\n\n";
 
-        $script .= ":do { /ip hotspot walled-garden remove [find dst-host~\"jasiri\"] } on-error={}\n";
-        $script .= "/ip hotspot walled-garden add action=allow dst-host=jasiri.stackverify.site\n";
-        $script .= "/ip hotspot walled-garden add action=allow dst-host=*.jasiri.stackverify.site\n\n";
+        $script .= ":do { /ip hotspot walled-garden remove [find dst-host~\"$serverHost\"] } on-error={}\n";
+        $script .= "/ip hotspot walled-garden add action=allow dst-host=$serverHost\n";
+        $script .= "/ip hotspot walled-garden add action=allow dst-host=*.$serverHost\n\n";
 
-        $script .= ":do { /ip dns static remove [find name=jasiri.local] } on-error={}\n";
-        $script .= "/ip dns static add name=jasiri.local address=10.10.0.1 ttl=1m\n\n";
+        $script .= ":do { /ip dns static remove [find name=onelink.local] } on-error={}\n";
+        $script .= "/ip dns static add name=onelink.local address=10.10.0.1 ttl=1m\n\n";
     }
 
     $script .= "/ip dns set allow-remote-requests=yes servers=8.8.8.8,8.8.4.4\n\n";
@@ -277,12 +247,12 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
         $script .= "/tool fetch mode={$serverScheme} url=\"{$serverScheme}://{$serverHost}/api/hotspot_login.php?device={$deviceId}\" dst-path=hotspot/login.html keep-result=yes as-value\n\n";
     }
 
-    $script .= "/log info \"Jasiri WiFi provisioning completed successfully\"\n";
+    $script .= "/log info \"OneLink provisioning completed successfully\"\n";
     $script .= "/log info \"Device ID: $deviceId\"\n";
     $script .= "/log info \"WireGuard Client IP: $wireguardIP\"\n\n";
 
     $script .= ":put \"======================================\"\n";
-    $script .= ":put \"Jasiri WiFi Provisioning Complete!\"\n";
+    $script .= ":put \"OneLink Provisioning Complete!\"\n";
     $script .= ":put \"======================================\"\n";
     $script .= ":put \"Device ID: $deviceId\"\n";
     $script .= ":put \"Client IP: $wireguardIP\"\n";
@@ -299,29 +269,11 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
 }
 
 function getWgPeerData() {
-    static $cache = null;
-    if ($cache !== null) return $cache;
-
-    $output = [];
-    exec("wg show wg0", $output);
-    $currentKey = null;
     $peers = [];
-    foreach ($output as $line) {
-        if (preg_match('/^\s*peer:\s*(\S+)/', $line, $m)) {
-            $currentKey = $m[1];
-            $peers[$currentKey] = ['handshake' => 0];
-        } elseif ($currentKey && preg_match('/^\s*latest handshake:\s*(.+)/', $line, $m)) {
-            $hs = trim($m[1]);
-            $total = 0;
-            if (preg_match('/(\d+)\s+days?/', $hs, $d)) $total += intval($d[1]) * 86400;
-            if (preg_match('/(\d+)\s+hours?/', $hs, $h)) $total += intval($h[1]) * 3600;
-            if (preg_match('/(\d+)\s+minutes?/', $hs, $m2)) $total += intval($m2[1]) * 60;
-            if (preg_match('/(\d+)\s+seconds?/', $hs, $s)) $total += intval($s[1]);
-            $peers[$currentKey]['handshake'] = $total > 0 ? time() - $total : 0;
-        }
+    foreach (tunGuard()->getPeerHandshakes() as $key => $timestamp) {
+        $peers[$key] = ['handshake' => $timestamp];
     }
-    $cache = $peers;
-    return $cache;
+    return $peers;
 }
 
 function isRouterOnlineWg($router) {
@@ -415,7 +367,7 @@ if ($method === 'POST') {
             'api_user' => $provData['api_user'],
             'api_pass' => $provData['api_pass'],
             'timestamp' => $provData['timestamp'],
-            'fetch_command' => "/tool fetch mode={$serverScheme} url=\"{$serverScheme}://" . getServerHost() . "/provision/$provisionToken\" dst-path=jasiri_{$provData['timestamp']}.rsc; :delay 2s; /import jasiri_{$provData['timestamp']}.rsc;",
+            'fetch_command' => "/tool fetch mode={$serverScheme} url=\"{$serverScheme}://" . getServerHost() . "/provision/$provisionToken\" dst-path=onelink_{$provData['timestamp']}.rsc; :delay 2s; /import onelink_{$provData['timestamp']}.rsc;",
         ]);
     }
 
@@ -508,17 +460,17 @@ if ($method === 'POST') {
         $apiPort = intval($router['port'] ?: 8729);
 
         try {
-            $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+            $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
             $api->connect();
 
             if ($security === 'open') {
-                try { $api->setWirelessProfile('jasiri-open', 'none', 'none'); } catch (Exception $e) { /* some RouterOS versions reject this */ }
-                $api->setWireless($ssid, 'jasiri-open', 'ap-bridge');
+                try { $api->setWirelessProfile('onelink-open', 'none', 'none'); } catch (Exception $e) { /* some RouterOS versions reject this */ }
+                $api->setWireless($ssid, 'onelink-open', 'ap-bridge');
             } else {
                 $api->setWireless($ssid, 'default', 'ap-bridge');
             }
 
-            $api->setBridgePort('wlan1', 'jasiri-bridge');
+            $api->setBridgePort('wlan1', 'onelink-bridge');
             $api->close();
 
             jsonResponse(['success' => true, 'message' => "Wireless configured: $ssid"]);
@@ -638,11 +590,10 @@ if ($method === 'GET') {
     }
 
     if ($action === 'wg_status') {
-        $output = [];
-        exec("echo 'jackal' | sudo -S wg show wg0 2>/dev/null", $output, $returnCode);
+        $status = tunGuard()->getStatus();
         jsonResponse([
-            'success' => $returnCode === 0,
-            'wg_output' => implode("\n", $output),
+            'success' => !empty($status),
+            'wg_output' => $status ? json_encode($status) : '',
         ]);
     }
 
@@ -659,7 +610,7 @@ if ($method === 'GET') {
         $apiPort = intval($router['port'] ?: 8729);
 
         try {
-            $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+            $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
             $api->connect();
 
             $active = $api->getHotspotActiveUsers();
@@ -684,7 +635,7 @@ if ($method === 'GET') {
         $apiPort = intval($router['port'] ?: 8729);
 
         try {
-            $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+            $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
             $api->connect();
 
             $resources = $api->getSystemResources();

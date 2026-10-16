@@ -21,9 +21,12 @@ switch ($action) {
         $name     = trim($input['name'] ?? '');
         $email    = trim($input['email'] ?? '');
         $password = $input['password'] ?? '';
+        $confirmPassword = $input['confirm_password'] ?? '';
 
-        if (!$name || !$email || !$password) {
+        if (!$name || !$email || !$password || !$confirmPassword) {
             respond(['success' => false, 'error' => 'Name, email and password are required'], 400);
+        } elseif ($password !== $confirmPassword) {
+            respond(['success' => false, 'error' => 'Passwords do not match'], 400);
         }
 
         if (strlen($password) < 4) {

@@ -1,7 +1,8 @@
 <?php
+require_once __DIR__ . '/../config.php';
 $deviceId = $_GET['device'] ?? '';
-$host = $_SERVER['HTTP_HOST'] ?? 'jasiri.stackverify.site';
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host = appHost();
+$scheme = appScheme();
 $captiveUrl = "$scheme://$host/captive?router=" . urlencode($deviceId);
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache');
@@ -11,7 +12,7 @@ header('Cache-Control: no-cache');
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jasiri WiFi</title>
+<title><?= htmlspecialchars(appName()) ?></title>
 
 <style>
 * {
@@ -57,7 +58,7 @@ body {
 <body>
 
 <div class="loader"></div>
-<div class="text">Connecting Jasiri WiFi...</div>
+<div class="text">Connecting <?= htmlspecialchars(appName()) ?>...</div>
 
 
 <script>

@@ -3,11 +3,11 @@
 
 <head>
     <meta charset="utf-8">
-    <title>jasiri x WISP | High-Speed Fiber Internet in sirari</title>
+    <title>OneLink x WISP | High-Speed Fiber Internet in sirari</title>
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <meta content="WISP fiber, fiber internet mombasa, home fiber siari, business internet siari, jasiri fiber, wireless internet" name="keywords">
-    <meta content="jasiri Data Fiber Technologies powered by WISP. Reliable and affordable pure optical fiber internet across Mombasa County. Plans from KES 1,500/month." name="description">
-    <meta property="og:title" content="jasiri x WISP | Fast & Reliable Fiber Internet in Mombasa">
+    <meta content="WISP fiber, fiber internet mombasa, home fiber siari, business internet siari, OneLink fiber, wireless internet" name="keywords">
+    <meta content="OneLink Data Fiber Technologies powered by WISP. Reliable and affordable pure optical fiber internet across Mombasa County. Plans from KES 1,500/month." name="description">
+    <meta property="og:title" content="OneLink x WISP | Fast & Reliable Fiber Internet in Mombasa">
     <meta property="og:description" content="Pure optical fiber intesh 30,000. CAK licensed & EHS certified.">
     <meta property="og:type" content="website">
 
@@ -390,7 +390,7 @@
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
                 <img src="" alt="" class="logo-img">
-                <span class="fw-bold" style="font-family: 'Space Grotesk';">jasiri <span class="text-luminous-blue">Fiber</span></span>
+                <span class="fw-bold" style="font-family: 'Space Grotesk';">OneLink <span class="text-luminous-blue">Fiber</span></span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -418,7 +418,8 @@
                     <h1 class="display-3 fw-bold mb-3 mt-2">Unlimited Fiber.<br><span style="color: var(--luminous-blue);">Powered by WISP.</span></h1>
                     <p class="lead text-secondary mb-4">Get the best out of your WISP connection with our pure optical fiber. Stable, fast, and local support in sirari.</p>
                     <div class="d-flex gap-3 mb-4 flex-wrap">
-                        <a href="/login" class="btn btn-luminous">LOGIN</a>
+                        <a href="/login?tab=register" class="btn btn-luminous">Register</a>
+                        <a href="/login" class="btn btn-outline-luminous">LOGIN</a>
                         <a href="#packages" class="btn btn-outline-luminous">WISP Bundle info</a>
                     </div>
                     <div class="d-flex flex-wrap gap-3">
@@ -439,7 +440,7 @@
             <div class="col-lg-6">
                 <h5 class="fw-bold text-luminous-blue text-uppercase">Seamless Setup</h5>
                 <h2 class="fw-bold mb-3">WISP Fiber Experience</h2>
-                <p class="text-secondary">At jasiri Data Fiber Technologies, we ensure your WISP connection is perfectly configured for our high-speed network. We serve Bamburi and Greater Mombasa with pure fiber that handles 4K streaming and gaming with ease.</p>
+                <p class="text-secondary">At OneLink Data Fiber Technologies, we ensure your WISP connection is perfectly configured for our high-speed network. We serve Bamburi and Greater Mombasa with pure fiber that handles 4K streaming and gaming with ease.</p>
                 <div class="row mt-4">
                     <div class="col-6 mb-3"><i class="fa fa-router text-luminous-blue me-2"></i> Pre-configured WISP</div>
                     <div class="col-6 mb-3"><i class="fa fa-shield-alt text-luminous-cyan me-2"></i> Secure WiFi</div>
@@ -496,7 +497,7 @@
         <div class="container">
             <div class="row g-4">
                 <div class="col-lg-4">
-                    <h4 class="text-navy-blue">jasiri Technologies</h4>
+                    <h4 class="text-navy-blue">OneLink Technologies</h4>
                     <p class="text-secondary">Your local experts for WISP fiber setups in sirari. Reliable, fast, and affordable internet.</p>
                 </div>
                 <div class="col-lg-4">
@@ -517,7 +518,7 @@
                 </div>
             </div>
             <hr>
-            <p class="text-center text-muted small">© 2026 jasiri Data Fiber Technologies. Optimized for WISP Solutions.</p>
+            <p class="text-center text-muted small">© 2026 OneLink Data Fiber Technologies. Optimized for WISP Solutions.</p>
         </div>
     </footer>
 

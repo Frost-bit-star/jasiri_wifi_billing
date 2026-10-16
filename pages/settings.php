@@ -193,8 +193,8 @@ include __DIR__ . '/../components/header.php';
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="profileBusinessName">Business Name</label>
-                    <input type="text" class="form-control" id="profileBusinessName" name="business_name" maxlength="40" value="<?= htmlspecialchars($profile['business_name'] ?? '') ?>" placeholder="e.g. Jasiri WiFi">
-                    <small style="color:var(--on-surface-med);">Shown as the brand on the captive portal page. Leave empty to use the default placeholder "WISP".</small>
+                    <input type="text" class="form-control" id="profileBusinessName" name="business_name" maxlength="40" value="<?= htmlspecialchars($profile['business_name'] ?? '') ?>" placeholder="e.g. OneLink">
+                    <small style="color:var(--on-surface-med);">Shown as the brand on the captive portal page. Leave empty to use the default placeholder "<?= htmlspecialchars(appName()) ?>".</small>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="profileCurrentPass">Current Password</label>

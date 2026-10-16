@@ -9,6 +9,30 @@ $adminName = $_SESSION['username'] ?? 'Admin';
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 .device-row { cursor: pointer; }
 </style>
+<?php if (!empty($_SESSION['just_registered'])): ?>
+<div id="onboardingModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:white;padding:24px;border-radius:8px;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+    <h3 style="margin:0 0 12px 0;">Welcome to <?= htmlspecialchars(appName()) ?>!</h3>
+    <p style="margin:0 0 16px 0;color:#666;">Let's get you set up in 3 quick steps:</p>
+    <ol style="margin:0 0 16px 24px;padding:0;line-height:1.8;">
+      <li>Complete your profile (Settings → Profile)</li>
+      <li>Set your business details</li>
+      <li>Add your first router to get started</li>
+    </ol>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="dismissOnboarding()" style="padding:8px 16px;border:1px solid #ddd;background:white;border-radius:4px;cursor:pointer;">Skip</button>
+      <a href="/settings" style="padding:8px 16px;background:#1a73e8;color:white;text-decoration:none;border-radius:4px;">Set up Profile</a>
+    </div>
+  </div>
+</div>
+<script>
+function dismissOnboarding() {
+  document.getElementById('onboardingModal').style.display='none';
+  fetch('/api/v1/auth.php?action=clear_onboarding', {method:'POST'}).catch(()=>{});
+}
+</script>
+<?php unset($_SESSION['just_registered']); endif; ?>
+
 
 <div class="page-header">
     <div class="page-header-left">

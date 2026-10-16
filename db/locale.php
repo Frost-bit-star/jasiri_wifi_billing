@@ -1,6 +1,8 @@
 <?php
 // db/locale.php - Shared currency & timezone configuration for the whole app
 
+require_once __DIR__ . '/../config.php';
+
 $defaultTimezone = 'Africa/Dar_es_Salaam';
 
 $currencyOptions = [

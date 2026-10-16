@@ -1,6 +1,8 @@
 <?php
 // schema.php
 
+require_once __DIR__ . '/../config.php';
+
 $db = new PDO('sqlite:' . __DIR__ . '/routers.db');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 

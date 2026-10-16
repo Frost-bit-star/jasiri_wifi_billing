@@ -23,7 +23,7 @@ include __DIR__ . '/../components/header.php';
             <div class="form-row">
                 <div class="form-group">
                     <label class="form-label" for="admName">Full Name</label>
-                    <input type="text" id="admName" class="form-control" placeholder="e.g. Jasiri Mombasa" required>
+                    <input type="text" id="admName" class="form-control" placeholder="e.g. OneLink Mombasa" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="admEmail">Email (login)</label>

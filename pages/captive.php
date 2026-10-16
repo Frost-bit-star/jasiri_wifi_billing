@@ -10,7 +10,7 @@ $appCurrencySymbol = $appCurrencyMap[$_SESSION['currency'] ?? 'TZS'] ?? 'TSh';
 appSetTimezone($_SESSION['timezone'] ?? $defaultTimezone);
 
 $routerDeviceId = $_GET['router'] ?? '';
-$redirURL = $_GET['url'] ?? 'https://jasiri.stackverify.site/success';
+$redirURL = $_GET['url'] ?? appUrl('/success');
 $error = '';
 $success = '';
 $autoLogin = false;
@@ -63,7 +63,7 @@ if ($businessName === '') {
     }
 }
 if ($businessName === '') {
-    $businessName = 'WISP';
+    $businessName = appName();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $router) {
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $router) {
             try {
                 $apiIP = !empty($router['wireguard_ip']) ? $router['wireguard_ip'] : $router['ip'];
                 $apiPort = intval($router['port'] ?: 8729);
-                $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+                $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
                 $api->connect();
                 $profile = null;
                 if (!empty($voucher['is_capped'])) {

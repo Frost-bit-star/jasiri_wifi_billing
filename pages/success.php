@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../config.php';
 header('Content-Type: text/html; charset=utf-8');
 ?>
 
@@ -8,7 +9,7 @@ header('Content-Type: text/html; charset=utf-8');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Jasiri WiFi - Connected</title>
+<title><?= htmlspecialchars(appName()) ?> - Connected</title>
 
 <style>
 
@@ -124,7 +125,7 @@ opacity:1;
 
 <p>
 Vocha yako imekubaliwa.<br>
-Sasa unaweza kutumia intaneti ya Jasiri WiFi.
+Sasa unaweza kutumia intaneti ya <?= htmlspecialchars(appName()) ?>.
 </p>
 
 

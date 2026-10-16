@@ -189,7 +189,7 @@ class MikroTikAPI {
             "=name=$username",
             "=password=$password",
             "=limit-uptime=$limitUptime",
-            "=comment=Jasiri voucher",
+            "=comment=OneLink voucher",
         ];
         if ($profile) {
             $cmd[] = "=profile=$profile";
@@ -378,7 +378,7 @@ class MikroTikAPI {
     }
 
     public function getInterfaceTraffic() {
-        return $this->command(['/interface/monitor-traffic', '=once=', '=interface=jasiri-wg']);
+        return $this->command(['/interface/monitor-traffic', '=once=', '=interface=onelink-wg']);
     }
 
     public function getSystemResources() {

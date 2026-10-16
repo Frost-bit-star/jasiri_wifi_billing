@@ -1,5 +1,7 @@
 <?php
 // /auth/session.php
+
+require_once __DIR__ . '/../config.php';
 //
 // Multi-identity session handling.
 //

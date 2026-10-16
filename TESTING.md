@@ -2,34 +2,12 @@
 
 ## Login Credentials
 
-- **URL:** https://jasiri.stackverify.site
+- **URL:** https://onelink.example.com
 - **Admin login:** username `admin`, password `1111`
 - (The email `jnyaragita12@gmail.com` is tied to this admin account)
 
 ---
 
-## Pre-Test: VPS Sudo Password
-
-The `addWireGuardPeer()` and `checkWgHandshake()` functions in `api/mikrotik.php` use:
-
-```php
-exec("echo 'jackal' | sudo -S wg set wg0 peer ...");
-```
-
-**If the VPS user password is NOT `jackal`, WireGuard peer management silently fails.**
-
-Fix on the VPS — either:
-1. Change the password in the code to match the VPS sudo password, or
-2. Grant passwordless sudo for `wg` commands:
-
-```bash
-# On the VPS, run as root:
-echo "www-data ALL=(ALL) NOPASSWD: /usr/bin/wg" > /etc/sudoers.d/jasiri-wg
-chmod 440 /etc/sudoers.d/jasiri-wg
-```
-
-Verify it works:
-```bash
 echo '' | sudo -S wg show wg0
 ```
 
@@ -40,7 +18,7 @@ echo '' | sudo -S wg show wg0
 SSH into the VPS and verify:
 
 ```bash
-sudo wg show wg0
+curl -s -H "X-API-Key: ${TUNGARD_API_KEY:-<key>}" http://127.0.0.1:9000/api/status
 ```
 
 Expected output should show:
@@ -49,16 +27,14 @@ Expected output should show:
 - No peers yet (or peers from previous tests)
 
 ```bash
-sudo ss -ulnp | grep 13231
+curl -s -H "X-API-Key: ${TUNGARD_API_KEY:-<key>}" http://127.0.0.1:9000/api/status
 ```
-
-Should show `wireguard-wg0` listening on UDP 13231.
 
 ---
 
 ## Test 2: Register a MikroTik Device
 
-1. Login as admin at https://jasiri.stackverify.site
+1. Login as admin at https://onelink.example.com
 2. Go to **MikroTik > Connect Device**
 3. Step 1 — Fill in:
    - Device Name: `test-router`
@@ -79,7 +55,7 @@ The page should show:
 SSH into the MikroTik router and paste the fetch command:
 
 ```
-/tool fetch mode=https url="https://jasiri.stackverify.site/provision/<TOKEN>" dst-path=jasiri_<timestamp>.rsc; :delay 2s; /import jasiri_<timestamp>.rsc;
+/tool fetch mode=https url="https://onelink.example.com/provision/<TOKEN>" dst-path=onelink_<timestamp>.rsc; :delay 2s; /import onelink_<timestamp>.rsc;
 ```
 
 Expected result:
@@ -87,7 +63,7 @@ Expected result:
 - `downloaded: 4KiB`
 - Script output ending with:
   ```
-  Jasiri WiFi Provisioning Complete!
+  OneLink Provisioning Complete!
   Device ID: <uuid>
   Client IP: 10.100.0.X
   Server IP: 10.100.0.1
@@ -102,7 +78,7 @@ If you see `Script Error: failure: already have ...` on re-runs, that means the 
 SSH into the VPS and check:
 
 ```bash
-sudo wg show wg0
+curl -s -H "X-API-Key: ${TUNGARD_API_KEY:-<key>}" http://127.0.0.1:9000/api/status
 ```
 
 After the MikroTik runs the provision script, you should see a new peer:
@@ -115,7 +91,7 @@ peer: <mikrotik-public-key>
   transfer: ...
 ```
 
-**If no peer appears:** the `addWireGuardPeer()` call failed (likely sudo password issue from Pre-Test above).
+**If no peer appears:** the TunGuard API call to add the peer failed; check TunGuard logs and API key.
 
 **If peer appears but no handshake:** the MikroTik firewall is blocking UDP 13231 outbound, or the MikroTik WireGuard config endpoint is wrong.
 
@@ -123,7 +99,7 @@ peer: <mikrotik-public-key>
 
 ## Test 5: Verify Web UI Detects Online Status
 
-1. Go to https://jasiri.stackverify.site (MikroTik > View Devices)
+1. Go to https://onelink.example.com (MikroTik > View Devices)
 2. The device card should show **Online** (green badge)
 
 If it still shows `provisioning`:
@@ -132,7 +108,7 @@ If it still shows `provisioning`:
 
 Test the check_status API directly:
 ```
-https://jasiri.stackverify.site/api/mikrotik.php?action=check_status&router_id=<ID>
+https://onelink.example.com/api/mikrotik.php?action=check_status&router_id=<ID>
 ```
 
 Should return:
@@ -142,7 +118,7 @@ Should return:
 
 If status is still `provisioning`, run on VPS:
 ```bash
-sudo wg show wg0 latest-handshakes
+curl -s -H "X-API-Key: ${TUNGARD_API_KEY:-<key>}" http://127.0.0.1:9000/api/status latest-handshakes
 ```
 
 Look for the MikroTik's public key and verify the handshake timestamp is recent (< 180 seconds).
@@ -174,13 +150,13 @@ If Step 2 never advances:
 
 ## Troubleshooting
 
-### sudo password mismatch
-The most likely failure on VPS. Fix: `echo "www-data ALL=(ALL) NOPASSWD: /usr/bin/wg" > /etc/sudoers.d/jasiri-wg`
+### TunGuard API issues
+Ensure TunGuard is running and reachable at http://127.0.0.1:9000 with valid TUNGARD_API_KEY.
 
 ### MikroTik can't reach server
 ```bash
 # On MikroTik:
-/tool fetch url="https://jasiri.stackverify.site" mode=https
+/tool fetch url="https://onelink.example.com" mode=https
 ```
 Should return 200/HTML. If not, DNS or firewall issue.
 

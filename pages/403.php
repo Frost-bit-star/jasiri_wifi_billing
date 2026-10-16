@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../config.php';
 http_response_code(403);
 ?>
 <!DOCTYPE html>
@@ -6,7 +7,7 @@ http_response_code(403);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>403 - Restricted | Jasiri WiFi</title>
+<title>403 - Restricted | <?= htmlspecialchars(appName()) ?></title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
@@ -139,7 +140,7 @@ body {
 <div class="container">
   <div class="logo">
     <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
-    Jasiri WiFi
+    <?= htmlspecialchars(appName()) ?>
   </div>
 
   <div class="error-icon">
@@ -159,7 +160,7 @@ body {
   </a>
 
   <p class="info">
-    Jasiri WiFi &middot; ISP Billing Platform
+    <?= htmlspecialchars(appName()) ?> &middot; ISP Billing Platform
   </p>
 </div>
 

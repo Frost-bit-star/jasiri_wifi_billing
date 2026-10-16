@@ -455,7 +455,7 @@ function updatePrintPreview() {
     preview.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">' + selected.map(v => `
         <div>
             <div style="border:2px dashed var(--surface-4);padding:16px;text-align:center;border-radius:var(--radius-md);background:var(--surface);">
-                <strong style="color:var(--blue-500);">${escapeHtml((v.router_ssid || 'Jasiri WiFi').toUpperCase())}</strong><br>
+                <strong style="color:var(--blue-500);">${escapeHtml((v.router_ssid || 'OneLink').toUpperCase())}</strong><br>
                 <div class="voucher-code" style="font-size:1.4rem;letter-spacing:3px;margin:8px 0;">${v.code}</div>
                 <small style="font-weight:600;">${escapeHtml(v.plan_name || '')}</small><br>
                 <small>${window.APP_CURRENCY} ${parseInt(v.price || 0).toLocaleString()}</small><br>
@@ -476,7 +476,7 @@ function updatePrintPreview() {
 function buildPrintVoucherHtml(v, i) {
     return `
         <div class="print-voucher">
-            <h4>${escapeHtml(v.router_ssid || 'Jasiri WiFi')}</h4>
+            <h4>${escapeHtml(v.router_ssid || 'OneLink')}</h4>
             <div class="code">${v.code}</div>
             <div class="qr-code" id="qr-${i}"></div>
             <div class="detail"><strong>Package:</strong> ${escapeHtml(v.plan_name || '—')}</div>
@@ -558,7 +558,7 @@ document.getElementById('generateForm').addEventListener('submit', async functio
         lastGenerated = (data.vouchers || []).map(v => ({
             ...v,
             plan_name: v.plan || '',
-            router_ssid: router ? router.name : 'Jasiri WiFi',
+            router_ssid: router ? router.name : 'OneLink',
             is_capped: v.is_capped || 0
         }));
 
@@ -566,7 +566,7 @@ document.getElementById('generateForm').addEventListener('submit', async functio
             '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px;">' +
             lastGenerated.map(v => `
                 <div style="border:2px dashed var(--surface-4);padding:16px;text-align:center;border-radius:var(--radius-md);background:var(--surface);">
-                    <strong style="color:var(--blue-500);">${escapeHtml(v.router_ssid || 'Jasiri WiFi')}</strong><br>
+                    <strong style="color:var(--blue-500);">${escapeHtml(v.router_ssid || 'OneLink')}</strong><br>
                     <div class="voucher-code" style="font-size:1.4rem;letter-spacing:3px;margin:8px 0;">${v.code}</div>
                     <small style="font-weight:600;">${escapeHtml(v.plan_name || '')}</small><br>
                     <small>${window.APP_CURRENCY} ${parseInt(v.price || 0).toLocaleString()}</small><br>

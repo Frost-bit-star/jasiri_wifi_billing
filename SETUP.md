@@ -1,6 +1,6 @@
-# Jasiri WiFi - Server Setup Guide
+# OneLink - Server Setup Guide
 
-Step-by-step guide for deploying the Jasiri WiFi billing system on a fresh Ubuntu server.
+Step-by-step guide for deploying the OneLink billing system on a fresh Ubuntu server.
 
 ---
 
@@ -8,7 +8,7 @@ Step-by-step guide for deploying the Jasiri WiFi billing system on a fresh Ubunt
 
 - Fresh Ubuntu 22.04/24.04 server (VPS or local)
 - Root or sudo access
-- A domain pointing to your server (e.g. `jasiri.stackverify.site`)
+- A domain pointing to your server (e.g. `onelink.example.com`)
 - Git installed
 
 ---
@@ -40,79 +40,17 @@ php -m | grep -E "sqlite3|curl|mbstring"
 
 ---
 
-## Step 3: Install WireGuard
+## Step 3: Install TunGuard
 
-WireGuard is used for secure management connections between MikroTik routers and this server.
+TunGuard manages the WireGuard server and router peers. The billing app
+provisions router peers through the TunGuard HTTP API.
 
-```bash
-sudo apt install -y wireguard wireguard-tools
-```
+1. Install TunGuard from https://github.com/TunGuard/tanguard-binary
+2. Configure TunGuard (server IP/subnet, listen port, and an API key)
+3. Start the TunGuard service
+4. Add `TUNGARD_API_KEY` to your `.env` (Step 5)
 
-Generate the server key pair and configure the interface:
-
-```bash
-# Generate server keys (stored securely in /etc/wireguard/keys/)
-sudo mkdir -p /etc/wireguard/keys
-sudo chmod 700 /etc/wireguard/keys
-
-sudo wg genkey | sudo tee /etc/wireguard/keys/server.key | sudo wg pubkey | sudo tee /etc/wireguard/keys/server.key.pub
-sudo chmod 600 /etc/wireguard/keys/server.key
-```
-
-Read the public key (you'll need it later):
-
-```bash
-cat /etc/wireguard/keys/server.key.pub
-```
-
-Create the WireGuard config:
-
-```bash
-SERVER_PRIVKEY=$(sudo cat /etc/wireguard/keys/server.key)
-
-sudo tee /etc/wireguard/wg0.conf <<EOF
-[Interface]
-Address = 10.100.0.1/24
-ListenPort = 13231
-PrivateKey = $SERVER_PRIVKEY
-
-# NAT: allow WireGuard clients to route through this server
-PostUp = iptables -t nat -A POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
-PostUp = iptables -A FORWARD -i wg0 -j ACCEPT
-PostUp = iptables -A FORWARD -o wg0 -j ACCEPT
-PostDown = iptables -t nat -D POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
-PostDown = iptables -D FORWARD -i wg0 -j ACCEPT
-PostDown = iptables -D FORWARD -o wg0 -j ACCEPT
-EOF
-
-sudo chmod 600 /etc/wireguard/wg0.conf
-```
-
-> **Note:** Replace `eth0` with your main network interface. Check with `ip route | grep default`.
-
-Enable IP forwarding and start WireGuard:
-
-```bash
-# Enable IP forwarding
-echo "net.ipv4.ip_forward = 1" | sudo tee /etc/sysctl.d/99-wireguard.conf
-sudo sysctl -p /etc/sysctl.d/99-wireguard.conf
-
-# Start and enable on boot
-sudo systemctl enable wg-quick@wg0
-sudo systemctl start wg-quick@wg0
-```
-
-Verify:
-
-```bash
-sudo wg show
-# Should show: interface: wg0, listening port: 13231
-
-ip addr show wg0
-# Should show: inet 10.100.0.1/24
-```
-
----
+Ensure TunGuard is reachable at `TUNGARD_API_URL` (default `http://127.0.0.1:9000`).
 
 ## Step 4: Configure Firewall
 
@@ -120,7 +58,7 @@ ip addr show wg0
 sudo ufw allow 22/tcp comment "SSH"
 sudo ufw allow 80/tcp comment "HTTP"
 sudo ufw allow 443/tcp comment "HTTPS"
-sudo ufw allow 13231/udp comment "WireGuard VPN"
+sudo ufw allow 13231/udp comment "TunGuard UDP"
 sudo ufw enable
 sudo ufw status
 ```
@@ -136,26 +74,29 @@ git clone https://github.com/Frost-bit-star/tendaN301-billing.git
 cd tendaN301-billing
 ```
 
-### Set the sudo password for WireGuard peer management
+### Configure `.env`
 
-The application needs to run `wg set` commands to add/remove MikroTik peers. Create a sudoers entry so the web server user can do this without a password prompt:
-
-```bash
-# For the default PHP built-in server running as your user:
-sudo visudo -f /etc/sudoers.d/jasiri-wireguard
-
-# Add this line (replace 'jackal' with your actual username):
-jackal ALL=(ALL) NOPASSWD: /usr/bin/wg set wg0 peer * allowed-ips *, /usr/bin/wg set wg0 peer * remove
-```
-
-> **If running under Nginx/Apache** (www-data user), replace `jackal` with `www-data`.
-
-### Save the server public key for the app
+Copy the example file and set the public URL of this instance plus the TunGuard API key:
 
 ```bash
-sudo cat /etc/wireguard/keys/server.key.pub > db/server_wg_pubkey.txt
-chmod 644 db/server_wg_pubkey.txt
+cp .env.example .env
+nano .env
 ```
+
+```env
+APP_NAME=OneLink
+APP_URL=https://onelink.example.com
+TUNGARD_API_URL=http://127.0.0.1:9000
+TUNGARD_API_KEY=<your-tunguard-api-key>
+```
+
+Get the TunGuard API key from the TunGuard dashboard under **Settings → API Key**.
+
+### WireGuard peers are managed by TunGuard
+
+Router provisioning goes through the TunGuard HTTP API, so the app no longer runs
+Peers are managed by the TunGuard API; no sudoers entry is needed. Make sure the TunGuard
+server is running and reachable at `TUNGARD_API_URL`. The server public key and listening port are read from the TunGuard API.
 
 ### Build the database
 
@@ -174,9 +115,7 @@ php -r "require 'db/schema.php';"
 ```bash
 chmod 600 db/routers.db
 chmod 700 db/
-chmod 644 db/server_wg_pubkey.txt
 chmod +x stack
-chmod +x wireguard-setup.sh
 ```
 
 ### Start the server
@@ -204,10 +143,10 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 Create the Nginx config:
 
 ```bash
-sudo tee /etc/nginx/sites-available/jasiri <<'EOF'
+sudo tee /etc/nginx/sites-available/onelink <<'EOF'
 server {
     listen 80;
-    server_name jasiri.stackverify.site;
+    server_name onelink.example.com;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -222,7 +161,7 @@ server {
 }
 EOF
 
-sudo ln -s /etc/nginx/sites-available/jasiri /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/onelink /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
@@ -231,7 +170,7 @@ sudo systemctl reload nginx
 Get the SSL certificate:
 
 ```bash
-sudo certbot --nginx -d jasiri.stackverify.site
+sudo certbot --nginx -d onelink.example.com
 sudo certbot renew --dry-run
 ```
 
@@ -242,9 +181,9 @@ sudo certbot renew --dry-run
 Create a systemd service so the PHP server starts automatically:
 
 ```bash
-sudo tee /etc/systemd/system/jasiri.service <<'EOF'
+sudo tee /etc/systemd/system/onelink.service <<'EOF'
 [Unit]
-Description=Jasiri WiFi Billing Server
+Description=OneLink Billing Server
 After=network.target
 
 [Service]
@@ -260,16 +199,16 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable jasiri
-sudo systemctl start jasiri
-sudo systemctl status jasiri
+sudo systemctl enable onelink
+sudo systemctl start onelink
+sudo systemctl status onelink
 ```
 
 ---
 
 ## Step 8: Open the Dashboard
 
-1. Go to `https://jasiri.stackverify.site`
+1. Go to `https://onelink.example.com`
 2. Login with:
    - Username: `admin`
    - Password: `1111`
@@ -292,7 +231,7 @@ sudo systemctl status jasiri
 3. **Step 2**: Copy and run the two commands on the MikroTik via Winbox/SSH:
    ```
    /system device-mode update mode=advanced fetch=yes
-   /tool fetch mode=https url="https://jasiri.stackverify.site/provision/TOKEN" dst-path=jasiri_TIMESTAMP.rsc; :delay 2s; /import jasiri_TIMESTAMP.rsc;
+   /tool fetch mode=https url="https://onelink.example.com/provision/TOKEN" dst-path=onelink_TIMESTAMP.rsc; :delay 2s; /import onelink_TIMESTAMP.rsc;
    ```
 4. Wait 1-2 minutes for the device to come online (dashboard polls automatically)
 5. **Step 3**: Configure services and finish
@@ -303,7 +242,7 @@ sudo systemctl status jasiri
 
 For each MikroTik router you connect:
 
-- [ ] Router has internet access (can reach `jasiri.stackverify.site`)
+- [ ] Router has internet access (can reach `onelink.example.com`)
 - [ ] RouterOS 7+ is installed
 - [ ] Run `/system device-mode update mode=advanced fetch=yes` (once per new router)
 - [ ] Run the `/tool fetch` provisioning command from the dashboard
@@ -326,7 +265,7 @@ MikroTik Router                        Your Server
     |                                      |
     |  4. Server saves pubkey             |
     |  5. Server runs:                    |
-    |     wg set wg0 peer <Y>             |
+    |     TunGuard adds peer <Y>          |
     |       allowed-ips 10.100.0.x/32     |
     |                                      |
     |<-- WireGuard handshake (UDP 13231) ->|
@@ -338,23 +277,23 @@ MikroTik Router                        Your Server
     |   (SSH, REST API, SNMP)             |
 ```
 
-- The server runs `wg0` on `10.100.0.1/24`, listening on UDP `13231`
-- `wg0.conf` contains **only** the `[Interface]` block — no static peers
+- TunGuard manages the WireGuard server (interface/IP/listen port) according to its configuration
+- TunGuard manages the interface configuration; no manual wg0.conf peers needed
 - Each MikroTik router **generates its own WireGuard key pair** during provisioning
 - The router keeps its private key; the server never sees it
 - After creating the WireGuard interface, the router calls `/api/wireguard_register.php` with its public key
-- The server saves the public key to the database and adds the peer dynamically via `wg set`
+- The server saves the public key to the database and adds the peer dynamically via TunGuard API.
 - MikroTik management (REST API, SSH) is only accessible over the WireGuard tunnel
 
 ---
 
 ## Troubleshooting
 
-### WireGuard not connecting
+### Tunnel not connecting
 
 ```bash
 # Check interface is up
-sudo wg show
+curl -s -H "X-API-Key: $TUNGARD_API_KEY" http://127.0.0.1:9000/api/status || echo "TunGuard API unreachable"
 
 # Check listening port
 ss -ulnp | grep 13231
@@ -371,23 +310,23 @@ sudo iptables -t nat -L -n | grep MASQUERADE
 
 ```bash
 # From the MikroTik terminal, test:
-/ping jasiri.stackverify.site
+/ping onelink.example.com
 
 # Check if port 13231 is reachable
-/tool netwatch add host=jasiri.stackverify.site port=13231 interval=10s
+/tool netwatch add host=onelink.example.com port=13231 interval=10s
 ```
 
 ### Dashboard shows 502 Bad Gateway
 
 ```bash
 # Check PHP server is running
-sudo systemctl status jasiri
+sudo systemctl status onelink
 
 # Check logs
-sudo journalctl -u jasiri -f
+sudo journalctl -u onelink -f
 
 # Restart
-sudo systemctl restart jasiri
+sudo systemctl restart onelink
 ```
 
 ### Database errors
@@ -401,7 +340,7 @@ ls -la db/routers.db
 # Should be: -rw------- (600)
 ```
 
-### UFW blocking WireGuard
+### UFW blocking TunGuard UDP
 
 ```bash
 sudo ufw status
@@ -420,7 +359,6 @@ sudo ufw reload
 tendaN301-billing/
 ├── index.php                    # Main router
 ├── stack                        # CLI launcher
-├── wireguard-setup.sh           # WireGuard setup script
 │
 ├── api/
 │   ├── mikrotik.php             # MikroTik provisioning + WG peers
@@ -449,7 +387,6 @@ tendaN301-billing/
 ├── db/
 │   ├── routers.db               # SQLite database
 │   ├── schema.php               # Schema migrations
-│   └── server_wg_pubkey.txt     # Server WireGuard public key
 │
 ├── auth/
 │   ├── v2.php                   # Tenda router communication
@@ -465,10 +402,10 @@ tendaN301-billing/
 | Task | Command |
 |------|---------|
 | Start server | `php stack start` |
-| Start as service | `sudo systemctl start jasiri` |
+| Start as service | `sudo systemctl start onelink` |
 | Build database | `php stack build` |
-| Check WireGuard | `sudo wg show` |
-| Restart WireGuard | `sudo systemctl restart wg-quick@wg0` |
-| Check server logs | `sudo journalctl -u jasiri -f` |
+| Check TunGuard API | `curl -s -H "X-API-Key: $TUNGARD_API_KEY" http://127.0.0.1:9000/api/status || echo "TunGuard API unreachable"` |
+| Restart TunGuard | `sudo systemctl restart tanguard` |
+| Check server logs | `sudo journalctl -u onelink -f` |
 | Check firewall | `sudo ufw status` |
-| Revoke SSL | `sudo certbot revoke --cert-name jasiri.stackverify.site` |
+| Revoke SSL | `sudo certbot revoke --cert-name onelink.example.com` |

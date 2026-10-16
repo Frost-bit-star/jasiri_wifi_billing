@@ -1,4 +1,4 @@
-# Jasiri WiFi - MikroTik Voucher Billing System
+# OneLink - MikroTik Voucher Billing System
 
 ![PHP](https://img.shields.io/badge/PHP-7.4+-blue) ![SQLite](https://img.shields.io/badge/SQLite-supported-orange) ![License](https://img.shields.io/badge/License-MIT-green) ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 
@@ -133,6 +133,25 @@ php stack start
 ```
 
 The dashboard will be available at `http://localhost:8000`.
+
+### 4. Configure `.env`
+
+Copy the example file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Description |
+|----------|-------------|
+| `APP_NAME` | Brand shown across the UI. Defaults to `OneLink`. |
+| `APP_URL` | Public base URL of this instance (e.g. `https://onelink.example.com`). Used for all internal links: captive portal redirect, MikroTik provisioning scripts and hotspot walled-garden rules. |
+| `TUNGARD_API_URL` | Base URL of the TunGuard server. Defaults to `http://127.0.0.1:9000`. |
+| `TUNGARD_API_KEY` | API key from the TunGuard dashboard (**Settings → API Key**). Required for router provisioning. |
+| `WG_ENDPOINT` | Optional override for the WireGuard endpoint advertised to routers. Defaults to the host of `APP_URL`. |
+| `SMS_API_URL` / `SMS_API_KEY` | Optional SMS gateway overrides. |
+
+> Router provisioning is handled through the TunGuard API.
 
 ---
 

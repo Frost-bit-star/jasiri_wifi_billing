@@ -56,7 +56,7 @@ function syncMikrotikUsers($db, $router) {
     $apiPort = intval($router['port'] ?: 8729);
 
     try {
-        $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+        $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
         $api->connect();
 
         if ($mode === 'pppoe') {

@@ -100,7 +100,7 @@ if ($method === 'POST') {
             $apiPort = intval($router['port'] ?: 8729);
 
             try {
-                $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+                $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
                 $api->connect();
 
                 foreach ($vouchers as $v) {
@@ -256,7 +256,7 @@ if ($method === 'POST') {
         // Record the actual plan window: the voucher expires when the plan
         // duration ends, not at the original creation-time + 30 day value.
         $db->prepare("UPDATE vouchers SET status = 'used', used_at = :ts, expires_at = :end_at WHERE id = :id")
-           ->execute([':ts' => date('Y-m-d H:i:s'), ':end_at' => $endAt, ':id' => $voucher['id']]);
+           ->execute([':ts' => gmdate('Y-m-d H:i:s'), ':end_at' => $endAt, ':id' => $voucher['id']]);
 
         jsonResponse([
             'success' => true,
@@ -303,7 +303,7 @@ if ($method === 'GET') {
 
         $stmt = $db->prepare("
             SELECT v.*, p.name as plan_name, p.days, p.hours, p.minutes, r.name as router_name,
-                   COALESCE(NULLIF(r.ssid, ''), 'Jasiri WiFi') as router_ssid
+                   COALESCE(NULLIF(r.ssid, ''), 'OneLink') as router_ssid
             FROM vouchers v
             LEFT JOIN plans p ON v.plan_id = p.id
             LEFT JOIN routers r ON v.router_id = r.id
@@ -371,7 +371,7 @@ if ($method === 'GET') {
 
             try {
                 require_once __DIR__ . '/mikrotik_api.php';
-                $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $voucher['password'] ?? '');
+                $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $voucher['password'] ?? '');
                 $api->connect();
                 $active = $api->getHotspotActiveUsers();
                 foreach ($active as $session) {
@@ -507,7 +507,7 @@ if ($method === 'DELETE') {
             $apiIP = !empty($router['wireguard_ip']) ? $router['wireguard_ip'] : $router['ip'];
             $apiPort = intval($router['port'] ?: 8729);
             try {
-                $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+                $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
                 $api->connect();
                 foreach ($rvs as $v) {
                     $api->removeHotspotUserByUsername($v['code']);

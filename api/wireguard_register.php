@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../db/schema.php';
+require_once __DIR__ . '/../services/tanguard.php';
 
 header('Content-Type: application/json');
 
@@ -80,26 +81,15 @@ $router = $ip->fetch(PDO::FETCH_ASSOC);
 
 if ($router && !empty($router['wireguard_ip'])) {
     $allowed = $router['wireguard_ip'];
-    $cmd = "echo 'jackal' | sudo -S wg set wg0 peer " .
-           escapeshellarg($pubkey) .
-           " allowed-ips " .
-           escapeshellarg($allowed . '/32') .
-           " 2>&1";
 
-    wg_log("Command: $cmd");
-    exec($cmd, $output, $returnCode);
-    wg_log("Return code: $returnCode");
-    if ($output) wg_log("Output: " . implode("\n", $output));
+    // Register the router as a peer on the TunGuard server via its API.
+    $added = tunGuard()->addPeer($pubkey, $allowed . '/32', $device, $device);
 
-    // Persist the peer so it survives a server reboot
-    $saveCmd = "echo 'jackal' | sudo -S wg showconf wg0 > /tmp/wg0_new.conf 2>&1 && echo 'jackal' | sudo -S cp /tmp/wg0_new.conf /etc/wireguard/wg0.conf 2>&1";
-    exec($saveCmd, $saveOutput, $saveReturn);
-    wg_log("Persist config return code: $saveReturn");
-    if ($saveOutput) wg_log("Persist output: " . implode("\n", $saveOutput));
-
-    $wgShow = [];
-    exec("wg show wg0 2>&1", $wgShow);
-    wg_log("wg show wg0:\n" . implode("\n", $wgShow));
+    if ($added) {
+        wg_log("TunGuard addPeer OK for $pubkey -> $allowed/32");
+    } else {
+        wg_log("ERROR: TunGuard addPeer failed for $pubkey -> $allowed/32");
+    }
 } else {
     wg_log("ERROR: no wireguard_ip for device_id=$device");
 }
