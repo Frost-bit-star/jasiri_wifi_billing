@@ -34,6 +34,6 @@ function getRouterConfig($id) {
  * @param string $prefix Optional prefix
  * @return string Path to the cookie file
  */
-function createCookieFile($prefix = 'tenda_') {
+function createCookieFile($prefix = 'onelink_') {
     return tempnam(sys_get_temp_dir(), $prefix);
 }

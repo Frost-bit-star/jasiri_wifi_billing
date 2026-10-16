@@ -1,7 +1,7 @@
 {
-  "name": "tendaN301-billing",
+  "name": "onelink-billing",
   "version": "1.0.0",
-  "description": "Tenda N301 micro-ISP billing and router management system",
+  "description": "OneLink micro-ISP billing and router management system",
   "private": true,
   "devDependencies": {
     "vercel-php": "^0.9.0"

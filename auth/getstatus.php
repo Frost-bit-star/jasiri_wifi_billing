@@ -4,7 +4,7 @@
 ======================= */
 $router   = "http://192.168.100.104:8080";
 $password = "12Serya"; // router password
-$cookie   = tempnam(sys_get_temp_dir(), 'tenda_'); // temporary cookie file
+$cookie   = tempnam(sys_get_temp_dir(), 'onelink_'); // temporary cookie file
 
 // Devices allowed full internet (lowercase MACs)
 $ALLOW_LIST = [

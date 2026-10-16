@@ -31,7 +31,7 @@ function getRouter($db, $routerId) {
 function connectToRouter($router) {
     $apiIP = !empty($router['wireguard_ip']) ? $router['wireguard_ip'] : $router['ip'];
     $apiPort = intval($router['port'] ?: 8729);
-    $api = new MikroTikAPI($apiIP, $apiPort, 'jasiri-api', $router['password'] ?? '');
+    $api = new MikroTikAPI($apiIP, $apiPort, 'onelink-api', $router['password'] ?? '');
     $api->connect();
     return $api;
 }

@@ -1,6 +1,9 @@
 # Ignore Composer vendor directory
 /vendor/
 
+# Ignore local environment configuration
+/.env
+
 # Ignore SQLite database
 /db/routers.db
 

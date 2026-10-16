@@ -125,7 +125,7 @@ function mpesaStkPush(
 
         'CallBackURL' => $callbackUrl,
 
-        'AccountReference' => 'JASIRI',
+        'AccountReference' => 'ONELINK',
 
         'TransactionDesc' =>
             'Internet Access'
