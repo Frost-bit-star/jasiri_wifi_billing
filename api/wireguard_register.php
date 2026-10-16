@@ -37,6 +37,27 @@ function wg_log($msg) {
     file_put_contents($logFile, $line, FILE_APPEND);
 }
 
+// Pick a free IP that neither TunGuard nor a registered router already holds.
+function wg_free_ip(PDO $db, array $exclude = []): ?string {
+    $used = [];
+    foreach (tunGuard()->getPeers() as $peer) {
+        $allowed = $peer['allowed_ip'] ?? '';
+        if ($allowed === '') continue;
+        $addr = trim(explode(',', $allowed)[0]);
+        $addr = trim(explode('/', $addr)[0]);
+        if (filter_var($addr, FILTER_VALIDATE_IP)) $used[] = $addr;
+    }
+    $stmt = $db->query("SELECT wireguard_ip FROM routers WHERE wireguard_ip IS NOT NULL AND wireguard_ip != '0.0.0.0' AND type='mikrotik' AND provisioning_status = 'registered'");
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $ip) $used[] = $ip;
+    foreach ($exclude as $e) $used[] = trim(explode('/', $e)[0]);
+    $used = array_unique($used);
+    for ($i = 2; $i < 254; $i++) {
+        $ip = "10.100.0.$i";
+        if (!in_array($ip, $used)) return $ip;
+    }
+    return null;
+}
+
 wg_log("--- REGISTER REQUEST ---");
 wg_log("Device: $device");
 wg_log("Pubkey: $pubkey");
@@ -80,24 +101,69 @@ $ip->execute([
 $router = $ip->fetch(PDO::FETCH_ASSOC);
 
 if ($router && !empty($router['wireguard_ip'])) {
-    $allowed = $router['wireguard_ip'];
+    $requested = trim(explode('/', $router['wireguard_ip'])[0]);
+    $tg = tunGuard();
+    $assigned = null;
 
-    // Register the router as a peer on the TunGuard server via its API.
-    $added = tunGuard()->addPeer($pubkey, $allowed . '/32', $device, $device);
-
-    if ($added) {
-        wg_log("TunGuard addPeer OK for $pubkey -> $allowed/32");
+    // First try the IP we planned for at provision time.
+    $r = $tg->addPeerDetailed($pubkey, $requested . '/32', $device, $device);
+    if (isset($r['success']) && $r['success'] === true) {
+        $assigned = $requested;
+        wg_log("TunGuard addPeer OK for $pubkey -> $requested/32");
     } else {
-        wg_log("ERROR: TunGuard addPeer failed for $pubkey -> $allowed/32");
+        $err = (string) ($r['error'] ?? '');
+        wg_log("TunGuard addPeer failed for $pubkey -> $requested/32 ($err)");
+
+        // On conflict (or if we can't tell), pick a fresh free IP and retry.
+        $exclude = [$requested];
+        for ($attempt = 0; $attempt < 5 && $assigned === null; $attempt++) {
+            $fresh = wg_free_ip($db, $exclude);
+            if ($fresh === null) break;
+            $r = $tg->addPeerDetailed($pubkey, $fresh . '/32', $device, $device);
+            if (isset($r['success']) && $r['success'] === true) {
+                $assigned = $fresh;
+                wg_log("TunGuard addPeer retry OK for $pubkey -> $fresh/32");
+                break;
+            }
+            $err = (string) ($r['error'] ?? '');
+            wg_log("TunGuard addPeer retry failed for $pubkey -> $fresh/32 ($err)");
+            $exclude[] = $fresh;
+            if (!TunGuardAPI::isIpConflict($r)) break; // not a conflict; stop
+        }
     }
-} else {
-    wg_log("ERROR: no wireguard_ip for device_id=$device");
+
+    if ($assigned !== null) {
+        // Persist the IP TunGuard actually accepted (may differ from planned).
+        if ($assigned !== $requested) {
+            $db->prepare("UPDATE routers SET wireguard_ip = :ip WHERE device_id = :device")
+               ->execute([':ip' => $assigned, ':device' => $device]);
+            wg_log("Updated router $device wireguard_ip: $requested -> $assigned");
+        }
+        wg_log("SUCCESS: $device assigned $assigned/32");
+        echo json_encode([
+            'success' => true,
+            'device' => $device,
+            'pubkey' => $pubkey,
+            'wireguard_ip' => $assigned,
+        ]);
+        exit;
+    }
+
+    wg_log("ERROR: exhausted retries for $device");
+    echo json_encode([
+        'success' => false,
+        'error' => 'failed to allocate a free WireGuard IP',
+        'device' => $device,
+        'pubkey' => $pubkey,
+    ]);
+    exit;
 }
 
-wg_log("--- DONE ---");
+wg_log("ERROR: no wireguard_ip for device_id=$device");
 
 echo json_encode([
-    'success' => true,
+    'success' => false,
+    'error' => 'no wireguard_ip for device',
     'device' => $device,
     'pubkey' => $pubkey
 ]);

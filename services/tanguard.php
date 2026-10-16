@@ -102,6 +102,21 @@ class TunGuardAPI
         string $deviceName = '',
         string $psk = ''
     ): bool {
+        $r = $this->addPeerDetailed($publicKey, $allowedIP, $deviceId, $deviceName, $psk);
+        return isset($r['success']) && $r['success'] === true;
+    }
+
+    /**
+     * Add a peer and return the raw response so callers can detect conflicts
+     * (e.g. the allowed_ip is already taken) and retry with a fresh IP.
+     */
+    public function addPeerDetailed(
+        string $publicKey,
+        string $allowedIP,
+        string $deviceId = '',
+        string $deviceName = '',
+        string $psk = ''
+    ): array {
         $r = $this->post('/api/peer/add', [
             'public_key'    => $publicKey,
             'allowed_ip'    => $allowedIP,
@@ -109,7 +124,19 @@ class TunGuardAPI
             'device_name'   => $deviceName,
             'preshared_key' => $psk,
         ]);
-        return isset($r['success']) && $r['success'] === true;
+        return is_array($r) ? $r : ['success' => false, 'error' => 'unreachable'];
+    }
+
+    /**
+     * True when an addPeer response indicates the requested IP is already in use.
+     */
+    public static function isIpConflict(array $response): bool
+    {
+        $err = strtolower((string) ($response['error'] ?? ''));
+        return strpos($err, 'already') !== false
+            || strpos($err, 'in use') !== false
+            || strpos($err, 'taken') !== false
+            || strpos($err, 'exists') !== false;
     }
 
     public function removePeer(string $publicKey): bool
