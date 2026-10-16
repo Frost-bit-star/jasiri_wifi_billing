@@ -27,6 +27,25 @@ if (!is_dir(LOGS)) mkdir(LOGS, 0777, true);
  * 🔒 Always run from project root
  */
 chdir(ROOT);
+function env($key, $default='') {
+    $file = ROOT . '/.env';
+    if (is_file($file)) {
+        foreach (file($file) as $line) {
+            $line = trim($line);
+            if ($line === '' || substr($line, 0, 1) === '#') continue;
+            if (strpos($line, '=') !== false) {
+                list($k, $v) = array_map('trim', explode('=', $line, 2));
+                if (trim($k) === $key) {
+                    return trim($v, "\'\" \t\r\n");
+                }
+            }
+        }
+    }
+    $g = getenv($key);
+    return ($g === false) ? $default : $g;
+}
+$port = intval(env('PORT', $port));
+
 
 // =====================
 // Helpers
