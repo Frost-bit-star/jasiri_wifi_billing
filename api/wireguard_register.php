@@ -3,7 +3,24 @@
 require_once __DIR__ . '/../db/schema.php';
 require_once __DIR__ . '/../services/tanguard.php';
 
-header('Content-Type: application/json');
+// Routers request ?format=plain so they can read the raw assigned IP directly.
+$plain = (($_GET['format'] ?? '') === 'plain');
+
+header($plain ? 'Content-Type: text/plain' : 'Content-Type: application/json');
+
+// In plain mode the router only understands a bare IP on success; anything else
+// (empty body) signals failure.
+function wg_respond($ok, array $data = []) {
+    global $plain;
+    if ($plain) {
+        echo $ok ? (string) ($data['wireguard_ip'] ?? '') : '';
+    } else {
+        echo json_encode($ok
+            ? array_merge(['success' => true], $data)
+            : array_merge(['success' => false], $data));
+    }
+    exit;
+}
 
 $device = '';
 $pubkey = '';
@@ -65,14 +82,12 @@ wg_log("Pubkey: $pubkey");
 if (!$device || !$pubkey) {
     $err = 'missing device or pubkey';
     wg_log("REJECTED: $err");
-    echo json_encode(['error' => $err]);
-    exit;
+    wg_respond(false, ['error' => $err]);
 }
 
 $stmt = $db->prepare("
     UPDATE routers 
-    SET wg_pubkey = :pubkey,
-        provisioning_status = 'registered'
+    SET wg_pubkey = :pubkey
     WHERE device_id = :device
 ");
 
@@ -133,36 +148,32 @@ if ($router && !empty($router['wireguard_ip'])) {
     }
 
     if ($assigned !== null) {
-        // Persist the IP TunGuard actually accepted (may differ from planned).
+        // Persist the IP TunGuard actually accepted and mark the router fully
+        // registered. We only flip provisioning_status once the peer exists.
+        $db->prepare("UPDATE routers SET wireguard_ip = :ip, provisioning_status = 'registered' WHERE device_id = :device")
+           ->execute([':ip' => $assigned, ':device' => $device]);
         if ($assigned !== $requested) {
-            $db->prepare("UPDATE routers SET wireguard_ip = :ip WHERE device_id = :device")
-               ->execute([':ip' => $assigned, ':device' => $device]);
             wg_log("Updated router $device wireguard_ip: $requested -> $assigned");
         }
         wg_log("SUCCESS: $device assigned $assigned/32");
-        echo json_encode([
-            'success' => true,
+        wg_respond(true, [
             'device' => $device,
             'pubkey' => $pubkey,
             'wireguard_ip' => $assigned,
         ]);
-        exit;
     }
 
     wg_log("ERROR: exhausted retries for $device");
-    echo json_encode([
-        'success' => false,
+    wg_respond(false, [
         'error' => 'failed to allocate a free WireGuard IP',
         'device' => $device,
         'pubkey' => $pubkey,
     ]);
-    exit;
 }
 
 wg_log("ERROR: no wireguard_ip for device_id=$device");
 
-echo json_encode([
-    'success' => false,
+wg_respond(false, [
     'error' => 'no wireguard_ip for device',
     'device' => $device,
     'pubkey' => $pubkey

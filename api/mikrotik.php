@@ -125,7 +125,7 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
     $script .= "# Device: $name - $deviceId\n";
     $script .= "# Generated: " . date('Y-m-d H:i:s') . " UTC\n";
     $script .= "# Service Mode: $mode\n";
-    $script .= "# Client WireGuard IP: $wireguardIP\n\n";
+    $script .= "# WireGuard IP: assigned by server at registration\n\n";
 
     $script .= "/system identity set name=\"$name\"\n\n";
 
@@ -159,17 +159,29 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
         $script .= ":do { /interface wireguard remove [find name=onelink-wg] } on-error={}\n";
         $script .= "/interface wireguard add mtu=1420 name=onelink-wg listen-port=13241\n\n";
 
-        $script .= ":do { /ip address remove [find interface=onelink-wg] } on-error={}\n";
-        $script .= "/ip address add address=$wireguardIP/24 interface=onelink-wg\n\n";
-
         $script .= ":do { /interface wireguard peers remove [find interface=onelink-wg] } on-error={}\n";
         $script .= "/interface wireguard peers add interface=onelink-wg public-key=\"$serverPubKey\" endpoint-address=$wgEndpoint endpoint-port=$listenPort allowed-address=10.100.0.0/24 persistent-keepalive=25s\n\n";
 
+        // Register the router's public key, then apply the IP the server assigns.
+        // We deliberately do NOT bake a fixed IP into the interface: the server
+        // is the source of truth and may reassign on conflict.
         $script .= ":local wgPub [/interface wireguard get [find name=onelink-wg] public-key]\n";
-        $script .= ":local url \"{$serverScheme}://{$serverHost}/api/wireguard_register.php\"\n";
+        $script .= ":local url \"{$serverScheme}://{$serverHost}/api/wireguard_register.php?format=plain\"\n";
         $script .= ":local postData (\"device={$deviceId}&pubkey=\" . \$wgPub)\n";
-        $script .= ":local r [/tool fetch mode=https url=\$url http-method=post http-data=\$postData http-header-field=\"Content-Type: application/x-www-form-urlencoded\" keep-result=no as-value]\n";
-        $script .= ":log info (\"WG REGISTER: \" . (\$r->\"status\"))\n\n";
+        $script .= ":local assignedIP \"\"\n";
+        $script .= ":do {\n";
+        $script .= "    :local r [/tool fetch mode=https url=\$url http-method=post http-data=\$postData http-header-field=\"Content-Type: application/x-www-form-urlencoded\" output=user as-value]\n";
+        $script .= "    :set assignedIP (\$r->\"data\")\n";
+        $script .= "} on-error={\n";
+        $script .= "    :log error \"WG REGISTER FAILED: fetch error\"\n";
+        $script .= "}\n";
+        $script .= ":if ([:len \$assignedIP] > 0) do={\n";
+        $script .= "    :do { /ip address remove [find interface=onelink-wg] } on-error={}\n";
+        $script .= "    /ip address add address=(\$assignedIP . \"/24\") interface=onelink-wg\n";
+        $script .= "    :log info (\"WG REGISTER OK: assigned \" . \$assignedIP)\n";
+        $script .= "} else={\n";
+        $script .= "    :log error \"WG REGISTER FAILED: no IP assigned\"\n";
+        $script .= "}\n\n";
     } else {
         $script .= "# WireGuard skipped (server not configured)\n\n";
     }
@@ -275,13 +287,19 @@ function generateProvisionScript($db, $routerId, $name, $wireguardIP, $deviceId,
 
     $script .= "/log info \"OneLink provisioning completed successfully\"\n";
     $script .= "/log info \"Device ID: $deviceId\"\n";
-    $script .= "/log info \"WireGuard Client IP: $wireguardIP\"\n\n";
+    if ($hasWG) {
+        $script .= "/log info (\"WireGuard Client IP: \" . \$assignedIP)\n\n";
+    } else {
+        $script .= "/log info \"WireGuard: not configured\"\n\n";
+    }
 
     $script .= ":put \"======================================\"\n";
     $script .= ":put \"OneLink Provisioning Complete!\"\n";
     $script .= ":put \"======================================\"\n";
     $script .= ":put \"Device ID: $deviceId\"\n";
-    $script .= ":put \"Client IP: $wireguardIP\"\n";
+    if ($hasWG) {
+        $script .= ":put (\"Client IP: \" . \$assignedIP)\n";
+    }
     $script .= ":put \"Server IP: 10.100.0.1\"\n";
     $script .= ":put \"======================================\"\n";
 
