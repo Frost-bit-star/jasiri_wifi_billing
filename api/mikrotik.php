@@ -68,8 +68,25 @@ function getServerPublicKey() {
 }
 
 function assignWireGuardIP($db) {
+    // IPs already recorded locally.
     $stmt = $db->query("SELECT wireguard_ip FROM routers WHERE wireguard_ip IS NOT NULL AND type='mikrotik'");
     $used = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    // Also avoid anything TunGuard has already allocated, even if it is not
+    // in our own DB (e.g. peers added via the TunGuard dashboard).
+    foreach (tunGuard()->getPeers() as $peer) {
+        $allowed = $peer['allowed_ip'] ?? '';
+        if ($allowed === '') {
+            continue;
+        }
+        // allowed_ip may be "10.100.0.5/32" or a list; take the first address.
+        $addr = trim(explode(',', $allowed)[0]);
+        $addr = trim(explode('/', $addr)[0]);
+        if (filter_var($addr, FILTER_VALIDATE_IP)) {
+            $used[] = $addr;
+        }
+    }
+
     for ($i = 2; $i < 254; $i++) {
         $ip = "10.100.0.$i";
         if (!in_array($ip, $used)) return $ip;
